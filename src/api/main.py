@@ -32,6 +32,7 @@ class MarketResearchRequest(BaseModel):
     max_products: Optional[int] = 50
     min_price: Optional[float] = None
     max_price: Optional[float] = None
+    use_real_shopping_sites: Optional[bool] = True
 
 class AnalysisResponse(BaseModel):
     status: str
@@ -192,7 +193,8 @@ async def research_market(request: MarketResearchRequest, background_tasks: Back
             product_description=request.product_description,
             category=request.category,
             max_products=request.max_products,
-            price_range=price_range
+            price_range=price_range,
+            use_real_shopping_sites=request.use_real_shopping_sites
         )
         
         # Convert to serializable format

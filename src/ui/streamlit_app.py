@@ -161,13 +161,17 @@ def display_product_analysis(data):
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Overall Score", f"{data.get('overall_score', 0):.1f}/10")
+        overall_score = data.get('overall_score', 0)
+        st.metric("Overall Score", f"{overall_score:.1f}/10" if overall_score is not None else "0.0/10")
     with col2:
-        st.metric("Trend Alignment", f"{data.get('trend_alignment_score', 0):.1f}/10")
+        trend_alignment = data.get('trend_alignment_score', 0)
+        st.metric("Trend Alignment", f"{trend_alignment:.1f}/10" if trend_alignment is not None else "0.0/10")
     with col3:
-        st.metric("Value Score", f"{data.get('value_score', 0):.1f}/10")
+        value_score = data.get('value_score', 0)
+        st.metric("Value Score", f"{value_score:.1f}/10" if value_score is not None else "0.0/10")
     with col4:
-        st.metric("Confidence", f"{data.get('confidence_level', 0)*100:.0f}%")
+        confidence = data.get('confidence_level', 0)
+        st.metric("Confidence", f"{confidence*100:.0f}%" if confidence is not None else "0%")
     
     # Detailed analysis sections
     tab1, tab2, tab3, tab4 = st.tabs(["Market Position", "Features", "Target Audience", "Recommendations"])
@@ -305,13 +309,14 @@ def display_market_research(data):
     with col2:
         price_analysis = data.get('price_analysis', {})
         avg_price = price_analysis.get('avg_price', 0)
-        st.metric("Average Price", f"${avg_price:.0f}")
+        st.metric("Average Price", f"${avg_price:.0f}" if avg_price is not None else "$0")
     with col3:
         sentiment = data.get('sentiment_analysis', {})
         overall_sentiment = sentiment.get('overall_sentiment', 0)
-        st.metric("Market Sentiment", f"{overall_sentiment:.2f}")
+        st.metric("Market Sentiment", f"{overall_sentiment:.2f}" if overall_sentiment is not None else "0.00")
     with col4:
-        st.metric("Average Rating", f"{data.get('average_rating', 0):.1f}⭐")
+        avg_rating = data.get('average_rating', 0)
+        st.metric("Average Rating", f"{avg_rating:.1f}⭐" if avg_rating is not None else "0.0⭐")
     
     # Detailed results
     tab1, tab2, tab3, tab4 = st.tabs(["Price Analysis", "Top Brands", "Market Trends", "Products"])
@@ -322,11 +327,15 @@ def display_market_research(data):
         if price_data:
             col1, col2 = st.columns(2)
             with col1:
-                st.metric("Min Price", f"${price_data.get('min_price', 0):.0f}")
-                st.metric("Max Price", f"${price_data.get('max_price', 0):.0f}")
+                min_price = price_data.get('min_price', 0)
+                max_price = price_data.get('max_price', 0)
+                st.metric("Min Price", f"${min_price:.0f}" if min_price is not None else "$0")
+                st.metric("Max Price", f"${max_price:.0f}" if max_price is not None else "$0")
             with col2:
-                st.metric("Median Price", f"${price_data.get('median_price', 0):.0f}")
-                st.metric("Price Std Dev", f"${price_data.get('price_std', 0):.0f}")
+                median_price = price_data.get('median_price', 0)
+                price_std = price_data.get('price_std', 0)
+                st.metric("Median Price", f"${median_price:.0f}" if median_price is not None else "$0")
+                st.metric("Price Std Dev", f"${price_std:.0f}" if price_std is not None else "$0")
     
     with tab2:
         st.subheader("🏆 Top Brands")
