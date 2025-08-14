@@ -8,6 +8,11 @@ from typing import Dict, List, Optional, Any
 import asyncio
 from datetime import datetime
 import json
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from ..analysis.product_analyzer import ProductAnalyzer, ProductInsight
 from ..agents.market_agent import MarketResearchAgent, MarketResearchResult

@@ -572,6 +572,222 @@ class ProductAnalyzer:
             demographics["age_range"] = "18-30"
         
         return demographics
+    
+    def _extract_ai_trend_score(self, ai_analysis: str) -> Optional[float]:
+        """Extract trend score from AI analysis"""
+        try:
+            if not ai_analysis:
+                return None
+            
+            # Look for numerical scores in the AI analysis
+            import re
+            score_patterns = [
+                r'trend.*?score.*?(\d+(?:\.\d+)?)',
+                r'score.*?(\d+(?:\.\d+)?)',
+                r'(\d+(?:\.\d+)?)/10',
+                r'(\d+(?:\.\d+)?)\s*out\s*of\s*10'
+            ]
+            
+            for pattern in score_patterns:
+                matches = re.findall(pattern, ai_analysis.lower())
+                if matches:
+                    score = float(matches[0])
+                    return min(score, 10.0)
+            
+            return None
+        except Exception as e:
+            logger.error(f"Error extracting AI trend score: {e}")
+            return None
+    
+    def _calculate_overall_score(self, trend_score: float, value_score: float, 
+                               feature_count: int, price_category: PriceCategory) -> float:
+        """Calculate overall product score"""
+        try:
+            # Weight different factors
+            weighted_score = (
+                trend_score * 0.3 +
+                value_score * 0.3 +
+                min(feature_count * 0.5, 3.0) +  # Cap feature bonus at 3 points
+                self._get_price_category_bonus(price_category) * 0.2
+            )
+            
+            return min(max(weighted_score, 0.0), 10.0)
+        except Exception as e:
+            logger.error(f"Error calculating overall score: {e}")
+            return 5.0
+    
+    def _get_price_category_bonus(self, price_category: PriceCategory) -> float:
+        """Get bonus points based on price category positioning"""
+        bonuses = {
+            PriceCategory.ULTRA_LUXURY: 8.0,
+            PriceCategory.LUXURY: 7.0,
+            PriceCategory.PREMIUM: 6.0,
+            PriceCategory.MID_RANGE: 5.0,
+            PriceCategory.BUDGET: 4.0
+        }
+        return bonuses.get(price_category, 5.0)
+    
+    def _calculate_confidence_level(self, ai_analysis: str, description: str) -> float:
+        """Calculate confidence level of the analysis"""
+        try:
+            confidence = 0.5  # Base confidence
+            
+            # Increase confidence based on available data
+            if ai_analysis and len(ai_analysis) > 100:
+                confidence += 0.2
+            
+            if description and len(description) > 50:
+                confidence += 0.2
+            
+            # Check for detailed information
+            if ai_analysis and any(word in ai_analysis.lower() for word in 
+                                 ['detailed', 'comprehensive', 'thorough']):
+                confidence += 0.1
+            
+            return min(confidence, 1.0)
+        except Exception as e:
+            logger.error(f"Error calculating confidence level: {e}")
+            return 0.5
+    
+    def _generate_customer_personas(self, demographics: Dict[str, str], 
+                                  price_category: PriceCategory) -> List[str]:
+        """Generate customer personas based on demographics and price"""
+        try:
+            personas = []
+            
+            age_range = demographics.get('age_range', '25-45')
+            income_level = demographics.get('income_level', 'Middle class')
+            lifestyle = demographics.get('lifestyle', 'Fashion-conscious')
+            
+            # Primary persona
+            if price_category in [PriceCategory.LUXURY, PriceCategory.ULTRA_LUXURY]:
+                personas.append(f"Affluent professional ({age_range}) with {lifestyle.lower()} lifestyle")
+                personas.append("High net worth individual seeking exclusive pieces")
+            elif price_category == PriceCategory.PREMIUM:
+                personas.append(f"Upwardly mobile professional ({age_range}) with premium taste")
+                personas.append("Quality-conscious consumer willing to invest in durable pieces")
+            else:
+                personas.append(f"Style-conscious individual ({age_range}) seeking good value")
+                personas.append("Fashion enthusiast looking for trendy, affordable options")
+            
+            # Add lifestyle-based personas
+            if "luxury" in lifestyle.lower():
+                personas.append("Luxury lifestyle enthusiast and brand collector")
+            elif "fashion" in lifestyle.lower():
+                personas.append("Fashion-forward trendsetter and early adopter")
+            
+            return personas[:3]  # Return top 3 personas
+        except Exception as e:
+            logger.error(f"Error generating customer personas: {e}")
+            return ["Fashion-conscious consumer", "Quality-seeking buyer"]
+    
+    def _generate_price_recommendations(self, price: float, category: str, value_score: float) -> List[str]:
+        """Generate price optimization recommendations"""
+        try:
+            recommendations = []
+            
+            ranges = self.price_ranges.get(category, {"min": 50, "max": 500})
+            
+            if price < ranges["min"]:
+                recommendations.append("Consider increasing price to match category expectations")
+            elif price > ranges["max"] * 1.5:
+                recommendations.append("Price may be too high for category - justify with premium features")
+            
+            if value_score < 5.0:
+                recommendations.append("Improve value proposition or consider price reduction")
+            elif value_score > 8.0:
+                recommendations.append("Strong value proposition supports current pricing")
+            
+            recommendations.append("Monitor competitor pricing for positioning adjustments")
+            
+            return recommendations
+        except Exception as e:
+            logger.error(f"Error generating price recommendations: {e}")
+            return ["Review pricing strategy based on market analysis"]
+    
+    def _generate_product_improvements(self, missing_features: List[str], 
+                                     trend_score: float, value_score: float) -> List[str]:
+        """Generate product improvement recommendations"""
+        try:
+            improvements = []
+            
+            if missing_features:
+                improvements.append(f"Consider adding: {', '.join(missing_features[:3])}")
+            
+            if trend_score < 5.0:
+                improvements.append("Update design to align with current trends")
+            
+            if value_score < 5.0:
+                improvements.append("Enhance features or materials to improve value proposition")
+            
+            improvements.append("Gather customer feedback for targeted improvements")
+            
+            if trend_score > 8.0:
+                improvements.append("Leverage trend-forward positioning in marketing")
+            
+            return improvements[:5]
+        except Exception as e:
+            logger.error(f"Error generating product improvements: {e}")
+            return ["Conduct market research for improvement opportunities"]
+    
+    def _analyze_target_demographics(self, price: float, brand: str, 
+                                   category: str, description: str) -> Dict[str, str]:
+        """Analyze target demographics - wrapper for _identify_target_demographics"""
+        return self._identify_target_demographics(brand, price, category)
+    
+    def _identify_peak_seasons(self, seasonal_demand: Dict[str, float]) -> List[str]:
+        """Identify peak seasons from demand data"""
+        try:
+            # Sort seasons by demand level
+            sorted_seasons = sorted(seasonal_demand.items(), key=lambda x: x[1], reverse=True)
+            
+            # Return seasons with above-average demand
+            avg_demand = sum(seasonal_demand.values()) / len(seasonal_demand)
+            peak_seasons = [season for season, demand in sorted_seasons if demand > avg_demand]
+            
+            return peak_seasons if peak_seasons else [sorted_seasons[0][0]]
+        except Exception as e:
+            logger.error(f"Error identifying peak seasons: {e}")
+            return ["spring"]
+    
+    def _extract_positioning_from_ai(self, ai_analysis: str) -> str:
+        """Extract market positioning insights from AI analysis"""
+        try:
+            if not ai_analysis:
+                return ""
+            
+            # Look for positioning-related keywords and phrases
+            positioning_keywords = [
+                "positioned as", "market position", "positioning", "targets",
+                "appeals to", "designed for", "caters to", "aimed at"
+            ]
+            
+            sentences = ai_analysis.split('.')
+            positioning_sentences = []
+            
+            for sentence in sentences:
+                sentence = sentence.strip()
+                if any(keyword in sentence.lower() for keyword in positioning_keywords):
+                    positioning_sentences.append(sentence)
+            
+            if positioning_sentences:
+                # Return the most relevant positioning statement
+                return positioning_sentences[0].strip()
+            
+            # If no explicit positioning found, try to extract from context
+            if "luxury" in ai_analysis.lower():
+                return "Positioned in the luxury segment"
+            elif "premium" in ai_analysis.lower():
+                return "Positioned as a premium offering"
+            elif "affordable" in ai_analysis.lower() or "budget" in ai_analysis.lower():
+                return "Positioned as an affordable option"
+            
+            return ""
+            
+        except Exception as e:
+            logger.error(f"Error extracting positioning from AI analysis: {e}")
+            return ""
+    
     def get_analysis_summary(self, insight: ProductInsight) -> Dict:
         """Get a summary of the analysis results"""
         return {
