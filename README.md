@@ -1,141 +1,254 @@
-# AI Luxury Fashion Brand Analysis System
+# AI Luxury Brand Analysis Platform
 
-A comprehensive AI-powered system for luxury fashion product analysis, market insights, and competitive intelligence.
+A comprehensive AI-powered platform for analyzing luxury fashion products, providing market insights, trend analysis, and strategic recommendations for luxury brands.
 
-## 🎯 Project Overview
+## 🚀 Features
 
-This system provides deep insights into luxury fashion products through:
-- **Fine-tuned LLaMA-3B model** trained on fashion datasets
-- **Product analysis engine** for detailed insights
-- **AI market research agent** with web scraping capabilities
-- **Competitive analysis** and sentiment monitoring
+- **Product Analysis**: Comprehensive analysis of luxury fashion products using AI models
+- **Market Positioning**: Intelligent market positioning analysis and competitive landscape assessment
+- **Trend Analysis**: Real-time trend alignment scoring and style longevity predictions
+- **Price Analysis**: Value scoring and pricing recommendations based on market data
+- **Customer Insights**: Target demographic analysis and customer persona generation
+- **Seasonal Analysis**: Demand pattern analysis and peak season identification
+- **REST API**: FastAPI-based backend for seamless integration
+- **Web Interface**: Beautiful Streamlit-based user interface
 
-## 🏗️ System Architecture
+## 📁 Project Structure
 
 ```
-├── src/
-│   ├── models/          # Fine-tuned model integration
-│   ├── analysis/        # Product analysis engine
-│   ├── agents/          # AI research agents
-│   ├── scraping/        # Web scraping modules
-│   ├── api/            # FastAPI endpoints
-│   └── utils/          # Utility functions
-├── data/               # Data storage
-├── configs/            # Configuration files
-├── notebooks/          # Jupyter notebooks for testing
-└── tests/              # Test suite
+AI-Luxury-Brand/
+├── src/                          # Source code
+│   ├── api/                      # FastAPI backend
+│   │   └── main.py              # Main API endpoints
+│   ├── models/                   # AI models
+│   │   └── gemini_fashion.py    # Gemini AI integration
+│   ├── analysis/                 # Analysis engines
+│   │   └── product_analyzer.py  # Main product analysis engine
+│   ├── agents/                   # AI agents
+│   │   └── market_agent.py      # Market research agent
+│   ├── utils/                    # Utility modules
+│   │   ├── database.py          # Database utilities
+│   │   ├── sentiment_analyzer.py # Sentiment analysis
+│   │   └── text_processing.py   # Text processing utilities
+│   └── ui/                       # User interface
+│       └── streamlit_app.py     # Streamlit web app
+├── datasets/                     # Data files
+│   ├── amazon_co-ecommerce_sample.csv
+│   ├── data_amazon.xlsx_-_Sheet1.csv
+│   └── handm.csv
+├── configs/                      # Configuration files
+│   └── config.py                # Application configuration
+├── myenv/                        # Python virtual environment
+├── .env                          # Environment variables
+├── .env.example                  # Environment variables template
+├── requirements.txt              # Python dependencies
+└── README.md                     # This file
 ```
 
-## 📊 Datasets Used for Fine-tuning
+## �️ Installation & Setup
 
-- **Fashion Product Feedback Dataset** (OpenDataBay, 2025)
-- **Amazon Fashion Reviews** (Amazon Product Data subset)
-- **Data4Fashion Text Dataset**
-- **Myntra Product Data** (Kaggle)
-- **H&M Product Descriptions** (Kaggle)
+### Prerequisites
+- Python 3.8+
+- Virtual environment (recommended)
 
-## 🚀 Key Features
-
-### 1. Product Analysis Engine
-- Deep product insights from user descriptions
-- Market positioning analysis
-- Trend alignment scoring
-- Price-value assessment
-- Feature gap analysis
-- Seasonal demand forecasting
-
-### 2. AI Market Research Agent
-- Automated competitor discovery
-- Market performance analysis
-- Customer sentiment analysis
-- Real-time review monitoring
-
-### 3. Enhanced Insights
-- **Market Positioning**: Competitive landscape analysis
-- **Trend Alignment**: Current/emerging trend matching
-- **Price-Value Assessment**: Competitive pricing recommendations
-- **Feature Gap Analysis**: Missing features identification
-- **Seasonal Forecasting**: Time-based demand predictions
-
-## 🛠️ Installation
-
-1. Clone the repository:
+### 1. Clone the Repository
 ```bash
 git clone <repository-url>
-cd AI-Luxury-Brand-
+cd AI-Luxury-Brand
 ```
 
-2. Install dependencies:
+### 2. Set Up Virtual Environment
+```bash
+# Windows
+python -m venv myenv
+myenv\Scripts\activate
+
+# Linux/Mac
+python -m venv myenv
+source myenv/bin/activate
+```
+
+### 3. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Set up environment variables:
+### 4. Environment Configuration
+Copy `.env.example` to `.env` and configure your API keys:
 ```bash
 cp .env.example .env
-# Edit .env with your API keys and model paths
+```
+
+Edit `.env` file:
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+DATABASE_URL=sqlite:///./fashion_analysis.db
+DEBUG=True
+```
+
+## 🚀 Running the Application
+
+### Option 1: Using Scripts
+
+#### Start the FastAPI Backend
+```bash
+# Windows
+C:/path/to/your/project/myenv/Scripts/python.exe -m uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
+
+# Linux/Mac
+python -m uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+#### Start the Streamlit Frontend
+```bash
+# Windows  
+C:/path/to/your/project/myenv/Scripts/python.exe -m streamlit run src/ui/streamlit_app.py
+
+# Linux/Mac
+streamlit run src/ui/streamlit_app.py
+```
+
+### Option 2: Using VS Code Tasks
+If using VS Code, you can use the pre-configured task:
+- Open Command Palette (`Ctrl+Shift+P`)
+- Type "Tasks: Run Task"
+- Select "Start Fashion API Server"
+
+## 📱 Usage
+
+### Web Interface
+1. Open your browser and navigate to `http://localhost:8501`
+2. Use the Streamlit interface to analyze products
+3. Input product details (name, brand, price, description)
+4. View comprehensive analysis results
+
+### API Endpoints
+The FastAPI server runs on `http://localhost:8000`
+
+#### Key Endpoints:
+- `GET /health` - Health check
+- `POST /analyze/product` - Analyze a product
+- `GET /docs` - Interactive API documentation
+- `GET /redoc` - Alternative API documentation
+
+#### Example API Usage:
+```python
+import requests
+
+# Analyze a product
+response = requests.post("http://localhost:8000/analyze/product", json={
+    "name": "Cashmere Sweater",
+    "brand": "Luxury Brand",
+    "price": 850.0,
+    "description": "Premium cashmere sweater with elegant design..."
+})
+
+analysis = response.json()
+print(f"Overall Score: {analysis['overall_score']}")
 ```
 
 ## 🔧 Configuration
 
-1. **Model Setup**: Place your fine-tuned LLaMA-3B model in `models/llama-3b-fashion/`
-2. **API Keys**: Configure scraping and API keys in `.env`
-3. **Database**: Initialize SQLite database for storing analysis results
+### API Keys
+- **Gemini API**: Required for AI-powered analysis
+- Get your API key from [Google AI Studio](https://makersuite.google.com/)
 
-## 📖 Usage
+### Database
+- Default: SQLite (for development)
+- Production: Configure PostgreSQL or other databases in `configs/config.py`
 
-### API Mode
-```bash
-uvicorn src.api.main:ap --reload
-```
+## 📊 Datasets
 
-### Interactive Analysis
-```python
-from src.analysis.product_analyzer import ProductAnalyzer
-from src.agents.market_agent import MarketResearchAgent
+The project includes sample datasets for testing and analysis:
+- `amazon_co-ecommerce_sample.csv` - Amazon fashion product samples
+- `data_amazon.xlsx_-_Sheet1.csv` - Amazon product data export
+- `handm.csv` - H&M fashion product data
 
-# Analyze a product
-analyzer = ProductAnalyzer()
-insights = analyzer.analyze_product({
-    "name": "Luxury Cashmere Sweater",
-    "brand": "Premium Brand",
-    "price": 450,
-    "description": "100% cashmere, hand-knitted..."
-})
+## 🧪 Analysis Features
 
-# Research market
-agent = MarketResearchAgent()
-market_data = agent.research_competitors(product_category="cashmere sweaters")p
-```
+### Product Analysis Engine
+- **Trend Alignment**: Scores products based on current fashion trends
+- **Market Positioning**: Analyzes competitive landscape and positioning
+- **Value Assessment**: Evaluates price-to-value ratio
+- **Feature Analysis**: Identifies key features and gaps
+- **Target Demographics**: Determines ideal customer segments
 
-## 🧪 Testing
+### AI Integration
+- **Gemini AI**: Advanced natural language processing for product descriptions
+- **Sentiment Analysis**: Customer sentiment evaluation
+- **Text Processing**: Advanced text analysis and feature extraction
 
-```bash
-pytest tests/ -v
-```
+## � API Documentation
 
-## 📈 Performance Metrics
+Once the FastAPI server is running, visit:
+- **Swagger UI**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
 
-- **Insight Accuracy**: >85% for trend alignment
-- **Market Coverage**: 500+ luxury brands monitored
-- **Analysis Speed**: <30 seconds per product
-- **Sentiment Accuracy**: >90% for customer reviews
+## 🛠️ Development
 
-## 🔮 Future Enhancements
+### Adding New Features
+1. Create new modules in the appropriate `src/` subdirectory
+2. Update `requirements.txt` if new dependencies are added
+3. Update this README with new features
 
-- Multi-modal analysis (text + images)
-- Real-time trend detection
-- Personalized recommendations
-- Advanced competitor tracking
+### Code Structure
+- **API Layer**: `src/api/` - FastAPI endpoints and request handling
+- **Analysis Layer**: `src/analysis/` - Core analysis algorithms
+- **Models Layer**: `src/models/` - AI model integrations
+- **Utils Layer**: `src/utils/` - Shared utilities and helpers
+- **UI Layer**: `src/ui/` - User interface components
 
-## 📄 License
+## � Performance
 
-See LICENSE file for details.
+- **Response Time**: Typical analysis completes in 2-5 seconds
+- **Concurrent Users**: Supports multiple simultaneous analyses
+- **Scalability**: Designed for horizontal scaling with load balancers
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🆘 Troubleshooting
+
+### Common Issues
+
+#### "Cannot connect to the API server"
+- Ensure the FastAPI server is running on port 8000
+- Check that no firewall is blocking the connection
+- Verify the API server started without errors
+
+#### "Module not found" errors
+- Activate your virtual environment: `myenv\Scripts\activate`
+- Install dependencies: `pip install -r requirements.txt`
+
+#### Gemini API errors
+- Verify your API key in the `.env` file
+- Check your API quota and billing status
+- Ensure the API key has the necessary permissions
+
+### Getting Help
+- Check the [Issues](../../issues) page for known problems
+- Create a new issue if you encounter a bug
+- Review the API documentation at `/docs` endpoint
+
+## 🔮 Future Enhancements
+
+- [ ] Integration with more AI models (GPT-4, Claude)
+- [ ] Real-time market data integration
+- [ ] Advanced visualization dashboards
+- [ ] Mobile app development
+- [ ] Multi-language support
+- [ ] Enhanced recommendation algorithms
+- [ ] Social media trend integration
+
+---
+
+**Made with ❤️ for the luxury fashion industry**
