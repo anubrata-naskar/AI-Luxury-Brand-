@@ -19,6 +19,8 @@ nltk>=3.8.0
 spacy>=3.7.0
 textblob>=0.17.0
 sentence-transformers>=2.2.0
+fuzzywuzzy>=0.18.0
+python-Levenshtein>=0.21.0  # For faster fuzzy matching
 
 # API frameworks
 fastapi>=0.104.0

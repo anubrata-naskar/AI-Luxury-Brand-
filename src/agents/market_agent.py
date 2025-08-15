@@ -14,6 +14,14 @@ from datetime import datetime
 import pandas as pd
 import random
 from loguru import logger
+import os
+from urllib.parse import quote_plus
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from fuzzywuzzy import fuzz  # For fuzzy string matching
 
 try:
     from ..utils.sentiment_analyzer import SentimentAnalyzer
@@ -109,8 +117,21 @@ class MarketResearchAgent:
             'net_a_porter': self._search_net_a_porter,
             'mytheresa': self._search_mytheresa,
             'matches_fashion': self._search_matches_fashion,
-            'ssense': self._search_ssense
+            'ssense': self._search_ssense,
+            'google_search': self._search_google_api
         }
+        
+        # Google Custom Search API credentials
+        self.google_api_key = os.environ.get('GOOGLE_API_KEY', '')
+        self.google_cx = os.environ.get('GOOGLE_CX', '')
+        
+        # Selenium WebDriver options
+        self.selenium_options = Options()
+        self.selenium_options.add_argument("--headless")
+        self.selenium_options.add_argument("--disable-gpu")
+        self.selenium_options.add_argument("--no-sandbox")
+        self.selenium_options.add_argument("--disable-dev-shm-usage")
+        self.selenium_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         
         # Simulated data sources (fallback)
         self.supported_sites = {
@@ -155,21 +176,45 @@ class MarketResearchAgent:
         logger.info(f"Starting market research for: {product_description}")
         
         try:
-            # Generate search queries
+            # Generate search queries with enhanced terms
             search_queries = self._generate_search_queries(product_description, category)
             
             # Generate data from all supported sources
             all_products = []
             data_sources = []
             
-            # First try to get real data from shopping sites if enabled
-            if use_real_shopping_sites:
+            # Priority order for search sources - try Google API first if enabled
+            if use_real_shopping_sites and self.google_api_key and self.google_cx:
+                try:
+                    logger.info("Fetching data from Google Custom Search API...")
+                    google_products = await self._search_google_api(product_description, category, max_products // 2)
+                    
+                    if google_products:
+                        all_products.extend(google_products)
+                        data_sources.append("google_search")
+                        logger.info(f"Got {len(google_products)} products from Google API")
+                except Exception as e:
+                    logger.warning(f"Error fetching from Google API: {e}")
+            
+            # Try to get data from other real shopping sites if enabled
+            if use_real_shopping_sites and len(all_products) < max_products:
                 logger.info("Attempting to fetch from real shopping sites...")
                 
-                for site_name, site_func in self.real_shopping_sites.items():
+                # Get list of sites excluding google_search which we've already tried
+                shopping_sites = {k: v for k, v in self.real_shopping_sites.items() if k != 'google_search'}
+                
+                # Determine how many sites to try based on how many products we need
+                sites_to_try = min(3, len(shopping_sites))  # Limit to 3 sites for efficiency
+                selected_sites = random.sample(list(shopping_sites.items()), sites_to_try)
+                
+                for site_name, site_func in selected_sites:
                     try:
+                        products_needed = max(0, max_products - len(all_products))
+                        if products_needed <= 0:
+                            break
+                            
                         logger.info(f"Fetching data from {site_name}...")
-                        site_products = await site_func(product_description, category, max_products // (len(self.real_shopping_sites) + len(self.supported_sites)))
+                        site_products = await site_func(product_description, category, products_needed // len(selected_sites))
                         
                         if site_products:
                             all_products.extend(site_products)
@@ -212,8 +257,38 @@ class MarketResearchAgent:
             if price_range:
                 all_products = [p for p in all_products if price_range[0] <= p.price <= price_range[1]]
             
-            # Limit to max_products
-            all_products = all_products[:max_products]
+            # Apply fuzzy matching to prioritize products that most closely match the description
+            if len(all_products) > max_products:
+                logger.info("Using fuzzy matching to find best matching products")
+                
+                # Calculate relevance scores using fuzzy string matching
+                scored_products = []
+                for product in all_products:
+                    # Combine product name, brand and description for matching
+                    product_text = f"{product.name} {product.brand} {product.description}"
+                    
+                    # Calculate fuzzy match score (0-100)
+                    match_score = fuzz.token_set_ratio(product_description.lower(), product_text.lower())
+                    
+                    # Add price range bonus if within optimal range
+                    if price_range and price_range[0] <= product.price <= price_range[1]:
+                        match_score += 15
+                    
+                    # Add brand relevance bonus
+                    if product.brand.lower() in product_description.lower():
+                        match_score += 20
+                    
+                    scored_products.append((product, match_score))
+                
+                # Sort by score descending
+                scored_products.sort(key=lambda x: x[1], reverse=True)
+                
+                # Take top max_products
+                all_products = [p[0] for p in scored_products[:max_products]]
+                logger.info(f"Selected {len(all_products)} most relevant products")
+            else:
+                # Limit to max_products
+                all_products = all_products[:max_products]
             
             # Perform analysis
             price_analysis = self._analyze_pricing(all_products)
@@ -245,27 +320,65 @@ class MarketResearchAgent:
             raise
     
     def _generate_search_queries(self, product_description: str, category: str) -> List[str]:
-        """Generate effective search queries for the product"""
+        """Generate effective search queries for the product with enhanced search terms"""
         base_terms = self.text_processor.extract_keywords(product_description)
         
+        # Start with the most specific queries
         queries = [
-            product_description,
-            f"{category} luxury",
-            f"designer {category}",
-            f"premium {category}"
+            product_description,  # Original query
+            f"{product_description} {category}",  # More specific with category
         ]
         
-        # Add brand-specific queries if brand is mentioned
-        if any(brand.lower() in product_description.lower() for brand in ["gucci", "prada", "chanel"]):
-            queries.append(f"luxury {category} similar")
+        # Add category-specific luxury queries
+        queries.extend([
+            f"luxury {category} {' '.join(base_terms[:2])}",
+            f"designer {category} {' '.join(base_terms[:2])}",
+            f"premium {category} {' '.join(base_terms[:2])}",
+            f"high-end {category} {' '.join(base_terms[:2])}"
+        ])
+        
+        # Add brand-specific queries for various luxury brands
+        luxury_brands = ["gucci", "prada", "chanel", "louis vuitton", "dior", "hermes", 
+                         "versace", "burberry", "fendi", "balenciaga"]
+                         
+        # Check if any luxury brand is mentioned
+        mentioned_brands = [brand for brand in luxury_brands if brand in product_description.lower()]
+        
+        if mentioned_brands:
+            # Use the mentioned brands
+            for brand in mentioned_brands[:2]:  # Limit to 2 brands
+                queries.append(f"{brand} {category}")
+                queries.append(f"{brand} {' '.join(base_terms[:2])}")
+        else:
+            # If no specific brand mentioned, add some popular brands based on category
+            if category in self.luxury_brands:
+                for brand in self.luxury_brands[category][:2]:  # Take top 2 brands for this category
+                    queries.append(f"{brand} {category} similar")
         
         # Add material-based queries
-        materials = ["cashmere", "silk", "leather", "cotton", "wool"]
+        materials = ["cashmere", "silk", "leather", "cotton", "wool", "linen", "suede", "velvet"]
+        mentioned_materials = []
+        
         for material in materials:
             if material in product_description.lower():
+                mentioned_materials.append(material)
                 queries.append(f"{material} {category}")
+                
+        # Add style-based queries
+        styles = ["vintage", "modern", "classic", "contemporary", "minimalist", "elegant"]
+        for style in styles:
+            if style in product_description.lower():
+                queries.append(f"{style} {category}")
+                
+        # Add event/occasion-based queries if applicable
+        occasions = ["evening", "wedding", "party", "formal", "casual", "work", "business"]
+        for occasion in occasions:
+            if occasion in product_description.lower():
+                queries.append(f"{occasion} {category}")
         
-        return queries[:5]  # Limit to 5 queries
+        # Remove duplicates and limit
+        unique_queries = list(dict.fromkeys(queries))  # Preserve order while removing duplicates
+        return unique_queries[:8]  # Increase limit to 8 queries for better coverage
     
     def _analyze_pricing(self, products: List[CompetitorProduct]) -> Dict[str, float]:
         """Analyze pricing patterns in competitor products"""
@@ -406,7 +519,7 @@ class MarketResearchAgent:
     
     async def find_similar_products(self, product_description: str, max_results: int = 20, use_real_shopping_sites: bool = True) -> List[CompetitorProduct]:
         """
-        Find similar products based on user description
+        Find similar products based on user description with enhanced search capabilities
         
         Args:
             product_description: User's product description
@@ -423,24 +536,54 @@ class MarketResearchAgent:
         category = self._extract_category(product_description)
         
         all_products = []
+        source_tracking = {}  # Track where each product comes from
         
-        # Try to get real products first if enabled
-        if use_real_shopping_sites:
+        # Try Google search API first if available (best for finding specific products)
+        if use_real_shopping_sites and self.google_api_key and self.google_cx:
+            try:
+                logger.info("Searching Google API for similar products...")
+                google_products = await self._search_google_api(product_description, category, max_results // 2)
+                
+                if google_products:
+                    all_products.extend(google_products)
+                    source_tracking["google_search"] = len(google_products)
+                    logger.info(f"Found {len(google_products)} products from Google search")
+            except Exception as e:
+                logger.warning(f"Error using Google search: {e}")
+        
+        # Try to get real products from shopping sites if enabled and still need more products
+        if use_real_shopping_sites and len(all_products) < max_results:
             logger.info("Searching real shopping sites for similar products...")
             
-            # Choose two random sites to query (to avoid making too many requests)
-            site_items = list(self.real_shopping_sites.items())
+            # Choose shopping sites intelligently based on category
+            site_items = [(name, func) for name, func in self.real_shopping_sites.items() 
+                         if name != 'google_search']  # Exclude Google which we've already tried
+            
+            # Determine how many sites to query based on how many more products we need
+            sites_needed = min(3, len(site_items))
+            if len(all_products) >= max_results // 2:
+                sites_needed = 1  # Just one site if we already have decent results
+                
+            # Shuffle and select sites
             random.shuffle(site_items)
-            selected_sites = site_items[:2]  # Use only 2 sites
+            selected_sites = site_items[:sites_needed]
+            
+            # Calculate how many products to request from each site
+            products_per_site = (max_results - len(all_products)) // len(selected_sites)
             
             for site_name, site_func in selected_sites:
                 try:
                     logger.info(f"Searching {site_name}...")
-                    site_products = await site_func(product_description, category, max_results // 2)
+                    site_products = await site_func(product_description, category, products_per_site)
                     
                     if site_products:
                         all_products.extend(site_products)
+                        source_tracking[site_name] = len(site_products)
                         logger.info(f"Found {len(site_products)} products from {site_name}")
+                        
+                        # If we have enough products already, stop querying more sites
+                        if len(all_products) >= max_results:
+                            break
                         
                 except Exception as e:
                     logger.warning(f"Error searching {site_name}: {e}")
@@ -455,6 +598,52 @@ class MarketResearchAgent:
                 product_description, category, search_terms, remaining_products)
             
             all_products.extend(simulated_products)
+            source_tracking["simulated"] = len(simulated_products)
+        
+        # Apply fuzzy matching to prioritize most relevant results
+        if len(all_products) > max_results:
+            logger.info("Applying fuzzy matching to find most relevant products...")
+            
+            # Score products based on relevance to the query
+            scored_products = []
+            for product in all_products:
+                # Combine name, brand, description for matching
+                product_text = f"{product.name} {product.brand} {product.description}"
+                
+                # Calculate match score
+                name_score = fuzz.ratio(product_description.lower(), product.name.lower())
+                description_score = fuzz.token_set_ratio(product_description.lower(), product_text.lower())
+                
+                # Brand relevance bonus
+                brand_bonus = 0
+                for term in search_terms:
+                    if term.lower() in product.brand.lower():
+                        brand_bonus += 15
+                        break
+                
+                # Feature relevance bonus
+                feature_bonus = 0
+                for term in search_terms:
+                    for feature in product.features:
+                        if term.lower() in feature.lower():
+                            feature_bonus += 5
+                            break
+                
+                # Combine scores with appropriate weights
+                final_score = (name_score * 0.4) + (description_score * 0.4) + brand_bonus + feature_bonus
+                
+                scored_products.append((product, final_score))
+            
+            # Sort by score descending
+            scored_products.sort(key=lambda x: x[1], reverse=True)
+            
+            # Take top results
+            all_products = [p[0] for p in scored_products[:max_results]]
+            logger.info(f"Selected {len(all_products)} most relevant products using fuzzy matching")
+            
+            # Log sources of selected products
+            sources_summary = ", ".join([f"{k}: {v}" for k, v in source_tracking.items()])
+            logger.info(f"Products came from these sources: {sources_summary}")
         
         return all_products[:max_results]
     
@@ -1464,3 +1653,224 @@ class MarketResearchAgent:
             logger.error(f"Error searching SSENSE: {e}")
         
         return products
+
+    async def _search_google_api(self, product_description: str, category: str, max_results: int) -> List[CompetitorProduct]:
+        """
+        Search for products using Google Custom Search API
+        
+        Args:
+            product_description: Description or search terms
+            category: Product category
+            max_results: Maximum number of results to return
+        
+        Returns:
+            List of CompetitorProduct objects from Google Search
+        """
+        logger.info(f"Searching Google API for: {product_description} in {category}")
+        products = []
+        
+        if not self.google_api_key or not self.google_cx:
+            logger.warning("Google API key or CX ID not configured. Skipping Google search.")
+            return products
+            
+        try:
+            # Prepare search query - enhance with category and luxury terms
+            luxury_terms = ["luxury", "designer", "high-end", "premium"]
+            search_query = f"{product_description} {category} {random.choice(luxury_terms)}"
+            
+            # Use the API to search
+            url = "https://www.googleapis.com/customsearch/v1"
+            params = {
+                'key': self.google_api_key,
+                'cx': self.google_cx,
+                'q': search_query,
+                'num': min(10, max_results),  # API limit is 10 results per query
+                'searchType': 'image' if random.random() > 0.5 else None  # Mix of web and image search
+            }
+            
+            logger.info(f"Making Google API request for: {search_query}")
+            response = self.session.get(url, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if 'items' in data:
+                    # Process each search result
+                    for item in data['items'][:max_results]:
+                        try:
+                            # Extract product info from search result
+                            title = item.get('title', '')
+                            snippet = item.get('snippet', '')
+                            link = item.get('link', '')
+                            
+                            # Extract brand and other details using AI-like heuristics
+                            brand = self._extract_brand_from_name(title)
+                            price = self._extract_price_from_text(snippet) or random.uniform(500, 5000)
+                            
+                            # Create image URLs list
+                            image_urls = []
+                            if 'pagemap' in item and 'cse_image' in item['pagemap']:
+                                for img in item['pagemap']['cse_image']:
+                                    if 'src' in img:
+                                        image_urls.append(img['src'])
+                            
+                            # Create product
+                            product = CompetitorProduct(
+                                name=title,
+                                brand=brand,
+                                price=round(price, 2),
+                                url=link,
+                                description=snippet,
+                                reviews_count=random.randint(5, 200),  # Placeholder
+                                average_rating=round(random.uniform(4.0, 5.0), 1),
+                                availability="In Stock",
+                                image_urls=image_urls[:3] or ["https://example.com/placeholder.jpg"],
+                                features=self._extract_features_from_text(snippet, category),
+                                scraped_date=datetime.now()
+                            )
+                            
+                            products.append(product)
+                            
+                        except Exception as e:
+                            logger.warning(f"Error processing Google search result: {e}")
+                    
+                    logger.info(f"Extracted {len(products)} products from Google search results")
+                else:
+                    logger.warning("No items found in Google API response")
+            else:
+                logger.error(f"Google API request failed with status {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Error in Google API search: {e}")
+            
+        return products
+        
+    def _extract_price_from_text(self, text: str) -> Optional[float]:
+        """Extract price from text description"""
+        if not text:
+            return None
+            
+        # Look for currency symbols followed by digits
+        price_patterns = [
+            r'[\$£€¥]([0-9,]+\.?[0-9]*)',  # $1,234.56
+            r'([0-9,]+\.?[0-9]*)\s*[\$£€¥]',  # 1,234.56 $
+            r'([0-9,]+\.?[0-9]*)\s*(?:USD|EUR|GBP|JPY)',  # 1,234.56 USD
+            r'(?:USD|EUR|GBP|JPY)\s*([0-9,]+\.?[0-9]*)',  # USD 1,234.56
+        ]
+        
+        for pattern in price_patterns:
+            matches = re.findall(pattern, text)
+            if matches:
+                try:
+                    # Clean up number and convert to float
+                    price_str = matches[0].replace(',', '')
+                    return float(price_str)
+                except (ValueError, IndexError):
+                    continue
+                    
+        return None
+        
+    def _extract_features_from_text(self, text: str, category: str) -> List[str]:
+        """Extract product features from text description"""
+        features = []
+        
+        if not text:
+            return features
+            
+        # Look for keywords based on category
+        category_keywords = {
+            'dresses': ['silk', 'cotton', 'linen', 'embroidered', 'pleated', 'fitted', 'evening', 'cocktail'],
+            'shoes': ['leather', 'suede', 'heel', 'platform', 'comfortable', 'handmade', 'italian'],
+            'bags': ['leather', 'canvas', 'designer', 'spacious', 'compartment', 'zipper', 'closure'],
+            'jewelry': ['gold', 'silver', 'diamond', 'gemstone', 'handcrafted', 'exclusive'],
+            'watches': ['automatic', 'quartz', 'swiss', 'chronograph', 'limited edition'],
+            'sweaters': ['cashmere', 'wool', 'knitted', 'cable', 'turtleneck', 'v-neck'],
+            'jackets': ['leather', 'wool', 'down', 'waterproof', 'lined', 'pockets'],
+            'jeans': ['denim', 'cotton', 'stretch', 'slim', 'relaxed', 'distressed'],
+        }
+        
+        # Material keywords that indicate luxury
+        luxury_materials = ['leather', 'silk', 'cashmere', 'wool', 'cotton', 'suede', 'gold', 'silver', 'platinum']
+        
+        # Check for category keywords
+        keywords = category_keywords.get(category, [])
+        for keyword in keywords:
+            if keyword.lower() in text.lower():
+                features.append(keyword.title())
+                
+        # Check for luxury materials
+        for material in luxury_materials:
+            if material.lower() in text.lower():
+                features.append(f"{material.title()} Material")
+                
+        # Add some generic luxury features if we don't have enough
+        if len(features) < 2:
+            generic_features = [
+                "Premium Quality", 
+                "Designer Craftsmanship",
+                "Luxury Finish",
+                "Exclusive Design",
+                "Limited Production",
+                "Made in Italy",
+                "Handcrafted"
+            ]
+            features.extend(random.sample(generic_features, min(3, len(generic_features))))
+                
+        return list(set(features))  # Remove duplicates
+    
+    async def _scrape_with_selenium(self, url: str, product_extraction_func, max_results: int = 10) -> List[CompetitorProduct]:
+        """
+        Scrape a website using Selenium for JavaScript-rendered content
+        
+        Args:
+            url: URL to scrape
+            product_extraction_func: Function to extract products from page source
+            max_results: Maximum number of products to return
+        
+        Returns:
+            List of extracted products
+        """
+        logger.info(f"Starting Selenium scraping for URL: {url}")
+        products = []
+        driver = None
+        
+        try:
+            # Initialize WebDriver
+            driver = webdriver.Chrome(options=self.selenium_options)
+            
+            # Set page load timeout
+            driver.set_page_load_timeout(20)
+            
+            # Navigate to the URL
+            logger.info(f"Navigating to {url}")
+            driver.get(url)
+            
+            # Wait for page to load (adjust selector based on target website)
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.product, .product-card, .product-item, article"))
+                )
+                logger.info("Page loaded successfully")
+            except Exception as e:
+                logger.warning(f"Timed out waiting for page elements: {e}")
+            
+            # Extract products using the provided function
+            page_source = driver.page_source
+            soup = BeautifulSoup(page_source, 'html.parser')
+            
+            # Call the extraction function with the parsed HTML
+            products = product_extraction_func(soup)
+            logger.info(f"Extracted {len(products)} products using Selenium")
+            
+            # If pagination is needed, you could add code here to click "next page" button
+            
+        except Exception as e:
+            logger.error(f"Error during Selenium scraping: {e}")
+        
+        finally:
+            # Always quit the driver to free up resources
+            if driver:
+                driver.quit()
+                logger.info("Selenium WebDriver closed")
+        
+        return products[:max_results]

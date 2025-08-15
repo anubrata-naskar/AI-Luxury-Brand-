@@ -12,6 +12,9 @@ A comprehensive AI-powered platform for analyzing luxury fashion products, provi
 - **Seasonal Analysis**: Demand pattern analysis and peak season identification
 - **REST API**: FastAPI-based backend for seamless integration
 - **Web Interface**: Beautiful Streamlit-based user interface
+- **Advanced Web Scraping**: Real-time data collection from luxury fashion websites using multiple methods
+- **Google Custom Search**: Integration with Google Custom Search API for comprehensive product research
+- **Fuzzy Matching**: Intelligent product matching to find closest results when exact matches aren't available
 
 ## 📁 Project Structure
 
