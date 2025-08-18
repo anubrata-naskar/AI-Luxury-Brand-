@@ -1,4 +1,4 @@
-#  AI Luxury Brand Analysis Platform
+# AI Luxury Brand Analysis Platform
 
 A comprehensive AI-powered platform for analyzing luxury fashion products, providing market insights, trend analysis, and strategic recommendations for luxury brands.
 
