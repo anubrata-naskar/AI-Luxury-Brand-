@@ -13,7 +13,7 @@ import time
 # Page configuration
 st.set_page_config(
     page_title="AI Luxury Fashion Analysis",
-    page_icon="👗",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -77,7 +77,7 @@ def call_api(endpoint: str, method: str = "GET", data: dict = None):
 
 def main():
     # Header
-    st.markdown('<div class="main-header">👗 AI Luxury Fashion Analysis</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"> AI Luxury Fashion Analysis</div>', unsafe_allow_html=True)
     st.markdown("---")
     
     # Sidebar
