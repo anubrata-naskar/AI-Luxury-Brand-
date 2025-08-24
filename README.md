@@ -7,7 +7,7 @@ A comprehensive AI-powered platform for analyzing luxury fashion products, provi
 - **Product Analysis**: Comprehensive analysis of luxury fashion products using AI models
 - **Market Positioning**: Intelligent market positioning analysis and competitive landscape assessment
 - **Trend Analysis**: Real-time trend alignment scoring and style longevity predictions
-- **Price Analysis**: Value scoring and pricing recommendations based on market data
+- **Price Analysis**: Value scoring and pricing recommendations based on  market data
 - **Customer Insights**: Target demographic analysis and customer persona generation
 - **Seasonal Analysis**: Demand pattern analysis and peak season identification
 - **REST API**: FastAPI-based backend for seamless integration
